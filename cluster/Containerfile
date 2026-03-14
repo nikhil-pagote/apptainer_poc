@@ -1,24 +1,50 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ARG APPTAINER_VERSION=1.4.5
 
+# Install Slurm (includes slurmctld, slurmd, slurm-client), slurmdbd, Munge, and utilities
 RUN apt-get update && apt-get install -y \
     slurm-wlm \
+    slurmdbd \
     munge \
     gosu \
+    mariadb-client \
+    curl \
     python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Create required directories and set ownership
-RUN mkdir -p \
-    /var/spool/slurmd \
-    /var/spool/slurmctld \
-    /var/log/slurm \
-    /var/run/slurm \
-    /var/run/munge \
-    && chown -R slurm:slurm /var/spool/slurmd /var/spool/slurmctld /var/log/slurm /var/run/slurm \
-    && chown -R munge:munge /var/run/munge /etc/munge
+# Install Apptainer inside the image so compute nodes can run .sif containers natively.
+# Follows the UPPMAX pattern: Slurm + Apptainer coexist on each compute node.
+RUN ARCH=$(dpkg --print-architecture) \
+    && curl -fsSL \
+       "https://github.com/apptainer/apptainer/releases/download/v${APPTAINER_VERSION}/apptainer_${APPTAINER_VERSION}_${ARCH}.deb" \
+       -o /tmp/apptainer.deb \
+    && apt-get install -y /tmp/apptainer.deb \
+    && rm /tmp/apptainer.deb \
+    && apptainer --version
 
-COPY entrypoint/slurmctld.sh /entrypoint/slurmctld.sh
-COPY entrypoint/slurmd.sh    /entrypoint/slurmd.sh
-RUN chmod +x /entrypoint/slurmctld.sh /entrypoint/slurmd.sh
+# Pin slurm user/group to UID/GID 990 so they are consistent across all nodes
+RUN groupmod --gid 990 slurm 2>/dev/null || groupadd -r --gid 990 slurm \
+    && usermod --uid 990 slurm 2>/dev/null || useradd -r -g slurm --uid 990 slurm
+
+# Create required runtime directories with correct ownership
+RUN mkdir -m 0755 -p \
+        /var/run/slurm \
+        /var/spool/slurm \
+        /var/lib/slurm \
+        /var/log/slurm \
+        /etc/slurm \
+    && chown slurm:slurm \
+        /var/run/slurm \
+        /var/spool/slurm \
+        /var/lib/slurm \
+        /var/log/slurm \
+        /etc/slurm
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["slurmd"]

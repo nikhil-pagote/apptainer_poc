@@ -1,66 +1,124 @@
 version: "3"
 
 # Multi-node HPC cluster simulation
-# - slurmctld : head/login node (submit jobs here)
-# - node1, node2 : compute nodes (run jobs here via slurmd)
-# Apptainer binary is bind-mounted from the host into compute nodes.
-# The /shared volume is the cluster's shared filesystem (like /scratch on real HPC).
+# ┌─────────────┐   ┌──────────────┐   ┌──────────────┐
+# │  slurmctld  │   │      c1      │   │      c2      │
+# │  (head node)│   │ (compute node│   │ (compute node│
+# │  + login    │   │   slurmd)    │   │   slurmd)    │
+# └──────┬──────┘   └──────┬───────┘   └──────┬───────┘
+#        │                 │                  │
+#        └─────────────────┴──────────────────┘
+#                     slurm-net
+#
+# slurmdbd + mysql provide job accounting.
+# /shared is the cluster shared filesystem (equivalent to /scratch on real HPC).
+# Apptainer is installed INSIDE the images — compute nodes run .sif containers natively.
 
 services:
 
+  # ── MariaDB: accounting database ──────────────────────────────────────────
+  mysql:
+    image: mariadb:10.11
+    hostname: mysql
+    container_name: mysql
+    environment:
+      MARIADB_ROOT_PASSWORD: root_password
+      MARIADB_USER: slurm
+      MARIADB_PASSWORD: slurm_password
+      MARIADB_DATABASE: slurm_acct_db
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - slurm-net
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "slurm", "-pslurm_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── slurmdbd: accounting daemon ───────────────────────────────────────────
+  slurmdbd:
+    build:
+      context: .
+      dockerfile: Containerfile
+    hostname: slurmdbd
+    container_name: slurmdbd
+    command: slurmdbd
+    volumes:
+      - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/slurmdbd.conf:/etc/slurm/slurmdbd.conf
+      - ./conf/munge.key:/etc/munge/munge.key:ro
+      - slurm-logs:/var/log/slurm
+    networks:
+      - slurm-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ── slurmctld: head / login node ──────────────────────────────────────────
   slurmctld:
     build:
       context: .
       dockerfile: Containerfile
     hostname: slurmctld
     container_name: slurmctld
-    entrypoint: ["/entrypoint/slurmctld.sh"]
+    command: slurmctld
     volumes:
       - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/slurmdbd.conf:/etc/slurm/slurmdbd.conf:ro
       - ./conf/munge.key:/etc/munge/munge.key:ro
       - ../shared:/shared
+      - slurm-state:/var/lib/slurm
+      - slurm-logs:/var/log/slurm
     networks:
       - slurm-net
     depends_on:
-      - node1
-      - node2
+      - slurmdbd
 
-  node1:
+  # ── c1: compute node 1 ────────────────────────────────────────────────────
+  c1:
     build:
       context: .
       dockerfile: Containerfile
-    hostname: node1
-    container_name: node1
-    entrypoint: ["/entrypoint/slurmd.sh"]
+    hostname: c1
+    container_name: c1
+    command: slurmd
     volumes:
       - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
       - ./conf/munge.key:/etc/munge/munge.key:ro
       - ../shared:/shared
-      # Bind-mount Apptainer from host so jobs can run .sif containers
-      - /usr/bin/apptainer:/usr/bin/apptainer:ro
-      - /usr/libexec/apptainer:/usr/libexec/apptainer:ro
+      - slurm-logs:/var/log/slurm
     security_opt:
       - apparmor=unconfined
     networks:
       - slurm-net
+    depends_on:
+      - slurmctld
 
-  node2:
+  # ── c2: compute node 2 ────────────────────────────────────────────────────
+  c2:
     build:
       context: .
       dockerfile: Containerfile
-    hostname: node2
-    container_name: node2
-    entrypoint: ["/entrypoint/slurmd.sh"]
+    hostname: c2
+    container_name: c2
+    command: slurmd
     volumes:
       - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
       - ./conf/munge.key:/etc/munge/munge.key:ro
       - ../shared:/shared
-      - /usr/bin/apptainer:/usr/bin/apptainer:ro
-      - /usr/libexec/apptainer:/usr/libexec/apptainer:ro
+      - slurm-logs:/var/log/slurm
     security_opt:
       - apparmor=unconfined
     networks:
       - slurm-net
+    depends_on:
+      - slurmctld
+
+volumes:
+  mysql-data:
+  slurm-state:
+  slurm-logs:
 
 networks:
   slurm-net:

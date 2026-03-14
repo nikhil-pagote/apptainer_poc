@@ -1,6 +1,9 @@
 #!/bin/bash
-# setup.sh — One-time cluster setup: generate munge key, copy shared scripts,
-#             build container images, and start the cluster.
+# setup.sh — One-time cluster setup:
+#   1. Generate munge authentication key
+#   2. Build Apptainer .sif images
+#   3. Copy scripts/jobs to shared filesystem
+#   4. Build and start the Podman cluster
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -16,12 +19,7 @@ else
     echo "    Already exists, skipping."
 fi
 
-echo "==> Copying scripts to shared filesystem..."
-cp -r "$REPO_ROOT/scripts/." "$SHARED/scripts/"
-cp -r "$REPO_ROOT/jobs/."    "$SHARED/jobs/"
-echo "    Done."
-
-echo "==> Building Apptainer images (this may take a few minutes)..."
+echo "==> Building Apptainer .sif images (may take a few minutes)..."
 cd "$REPO_ROOT"
 
 if [ ! -f "$SHARED/images/python.sif" ]; then
@@ -38,20 +36,30 @@ else
     echo "    dask.sif already exists, skipping."
 fi
 
+echo "==> Syncing scripts and jobs to shared filesystem..."
+cp -r "$REPO_ROOT/scripts/." "$SHARED/scripts/"
+cp -r "$REPO_ROOT/jobs/."    "$SHARED/jobs/"
+echo "    Done."
+
 echo "==> Building and starting the Slurm cluster..."
 cd "$REPO_ROOT/cluster"
 podman-compose build
 podman-compose up -d
 
 echo ""
-echo "Cluster is up! Nodes: slurmctld (head), node1, node2"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║  Cluster is up!                                              ║"
+echo "║  Services: mysql  slurmdbd  slurmctld  c1  c2               ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
-echo "Next steps:"
-echo "  # Open a shell on the head node to submit jobs:"
-echo "  podman exec -it slurmctld bash"
+echo "  Shell into the head node:"
+echo "    make shell"
+echo "    # or: podman exec -it slurmctld bash"
 echo ""
-echo "  # Inside the head node:"
-echo "  sbatch /shared/jobs/hello.sh"
-echo "  sbatch /shared/jobs/dask_job.sh"
-echo "  squeue"
-echo "  cat /shared/output/hello_<jobid>.out"
+echo "  Inside the head node, submit jobs:"
+echo "    sinfo                              # view nodes"
+echo "    sbatch /shared/jobs/hello.sh       # multi-node hello"
+echo "    sbatch /shared/jobs/dask_job.sh    # Dask workload"
+echo "    sbatch /shared/jobs/uppmax_demo.sh # UPPMAX bind-mount pattern"
+echo "    squeue                             # job queue"
+echo "    cat /shared/output/<job>.out       # view output"
