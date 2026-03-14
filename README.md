@@ -12,11 +12,12 @@ Follows the [UPPMAX Singularity/Apptainer workshop](https://pmitev.github.io/UPP
 Host machine (Pop!_OS)
 │
 ├── Podman (rootless)
-│   ├── postgres    ← PostgreSQL 18 — job accounting database
-│   ├── slurmdbd    ← Slurm database daemon
-│   ├── slurmctld   ← Head / login node  (submit jobs here)
-│   ├── c1          ← Compute node 1  (slurmd + Apptainer)
-│   └── c2          ← Compute node 2  (slurmd + Apptainer)
+│   ├── postgres         ← PostgreSQL 18 — job accounting database
+│   ├── slurmdbd         ← Slurm database daemon
+│   ├── slurmctld        ← Head / login node  (submit jobs here)
+│   ├── dask-scheduler   ← Slurm node: partition=dask-scheduler  (runs dask-scheduler process)
+│   ├── c1               ← Slurm node: partition=dask-workers + compute  (runs dask-worker)
+│   └── c2               ← Slurm node: partition=dask-workers + compute  (runs dask-worker)
 │
 └── shared/         ← Cluster shared filesystem (/scratch equivalent)
     ├── images/     ← Apptainer .sif images
@@ -74,7 +75,7 @@ sacct          # completed job accounting
 sbatch /shared/jobs/hello.sh
 
 # Dask distributed — scheduler + workers as Slurm jobs
-sbatch /shared/jobs/dask_scheduler.sh   # start scheduler on any node
+sbatch /shared/jobs/dask_scheduler.sh   # start scheduler on dask-scheduler node
 sbatch /shared/jobs/dask_workers.sh     # start workers on c1 + c2
 python3 /shared/scripts/dask_hello.py   # connect and run tasks
 
@@ -120,7 +121,7 @@ apptainer_poc/
 ├── cluster/
 │   ├── Containerfile              # Ubuntu 24.04 LTS + Slurm + Munge + Apptainer
 │   ├── docker-entrypoint.sh       # unified startup: slurmctld | slurmd | slurmdbd
-│   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + c1 + c2
+│   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + dask-scheduler + c1 + c2
 │   └── conf/
 │       ├── slurm.conf             # Slurm cluster configuration
 │       └── slurmdbd.conf          # Slurm accounting daemon configuration

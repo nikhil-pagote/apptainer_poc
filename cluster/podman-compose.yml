@@ -1,14 +1,14 @@
 version: "3"
 
 # Multi-node HPC cluster simulation
-# ┌─────────────┐   ┌──────────────┐   ┌──────────────┐
-# │  slurmctld  │   │      c1      │   │      c2      │
-# │  (head node)│   │ (compute node│   │ (compute node│
-# │  + login    │   │   slurmd)    │   │   slurmd)    │
-# └──────┬──────┘   └──────┬───────┘   └──────┬───────┘
-#        │                 │                  │
-#        └─────────────────┴──────────────────┘
-#                     slurm-net
+# ┌─────────────┐   ┌────────────────┐   ┌──────────────┐   ┌──────────────┐
+# │  slurmctld  │   │ dask-scheduler │   │      c1      │   │      c2      │
+# │  (head node)│   │ partition:     │   │ partition:   │   │ partition:   │
+# │  + login    │   │ dask-scheduler │   │ dask-workers │   │ dask-workers │
+# └──────┬──────┘   └───────┬────────┘   └──────┬───────┘   └──────┬───────┘
+#        │                  │                   │                  │
+#        └──────────────────┴───────────────────┴──────────────────┘
+#                                  slurm-net
 #
 # slurmdbd + postgres provide job accounting.
 # /shared is the cluster shared filesystem (equivalent to /scratch on real HPC).
@@ -73,6 +73,26 @@ services:
       - slurm-net
     depends_on:
       - slurmdbd
+
+  # ── dask-scheduler: dedicated node for Dask scheduler partition ───────────
+  dask-scheduler:
+    build:
+      context: .
+      dockerfile: Containerfile
+    hostname: dask-scheduler
+    container_name: dask-scheduler
+    command: slurmd
+    volumes:
+      - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/munge.key:/etc/munge/munge.key:ro
+      - ../shared:/shared
+      - slurm-logs:/var/log/slurm
+    security_opt:
+      - apparmor=unconfined
+    networks:
+      - slurm-net
+    depends_on:
+      - slurmctld
 
   # ── c1: compute node 1 ────────────────────────────────────────────────────
   c1:

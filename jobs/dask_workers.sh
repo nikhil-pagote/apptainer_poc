@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=dask-workers
 #SBATCH --output=/shared/output/dask_workers_%j.out
+#SBATCH --partition=dask-workers
 #SBATCH --ntasks=2
 #SBATCH --nodes=2
 #SBATCH --time=00:30:00
