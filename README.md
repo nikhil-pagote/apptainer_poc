@@ -12,7 +12,7 @@ Follows the [UPPMAX Singularity/Apptainer workshop](https://pmitev.github.io/UPP
 Host machine (Pop!_OS)
 │
 ├── Podman (rootless)
-│   ├── postgres    ← PostgreSQL — job accounting database
+│   ├── postgres    ← PostgreSQL 18 — job accounting database
 │   ├── slurmdbd    ← Slurm database daemon
 │   ├── slurmctld   ← Head / login node  (submit jobs here)
 │   ├── c1          ← Compute node 1  (slurmd + Apptainer)
@@ -28,7 +28,7 @@ Host machine (Pop!_OS)
 **Key design points:**
 - Apptainer is installed **inside** each compute node image — no bind-mounting from host
 - The [UPPMAX bind-mount pattern](https://pmitev.github.io/UPPMAX-Singularity-workshop/CaseStudies/SLURM_in_container/) is demonstrated: Slurm commands (`sbatch`, `squeue`) work from **within** an Apptainer container by bind-mounting the node's Slurm binaries + munge socket
-- `slurmdbd` + PostgreSQL provide full job accounting (`sacct`)
+- `slurmdbd` + PostgreSQL 18 provide full job accounting (`sacct`)
 
 ---
 
