@@ -46,6 +46,13 @@ case "$1" in
         exec gosu slurm slurmd -D -N "$(hostname)"
         ;;
 
+    dask-client)
+        # Wait for compute nodes to register with slurmctld before submitting jobs
+        wait_for slurmctld 6817
+        echo "[entrypoint] Starting dask-client (SLURMCluster)..."
+        exec python3 /shared/scripts/dask_jobqueue_example.py
+        ;;
+
     *)
         exec "$@"
         ;;

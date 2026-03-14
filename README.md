@@ -16,7 +16,8 @@ Host machine (Pop!_OS)
 │   ├── slurmdbd    ← Slurm database daemon
 │   ├── slurmctld   ← Head / login node  (submit jobs here)
 │   ├── c1          ← Compute node 1  (slurmd + Apptainer)
-│   └── c2          ← Compute node 2  (slurmd + Apptainer)
+│   ├── c2          ← Compute node 2  (slurmd + Apptainer)
+│   └── dask-client ← Submits Dask workers as Slurm jobs (dask-jobqueue)
 │
 └── shared/         ← Cluster shared filesystem (/scratch equivalent)
     ├── images/     ← Apptainer .sif images
@@ -118,7 +119,7 @@ apptainer_poc/
 ├── cluster/
 │   ├── Containerfile              # Ubuntu 24.04 LTS + Slurm + Munge + Apptainer
 │   ├── docker-entrypoint.sh       # unified startup: slurmctld | slurmd | slurmdbd
-│   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + c1 + c2
+│   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + c1 + c2 + dask-client
 │   └── conf/
 │       ├── slurm.conf             # Slurm cluster configuration
 │       └── slurmdbd.conf          # Slurm accounting daemon configuration
@@ -132,6 +133,11 @@ apptainer_poc/
 ├── scripts/
 │   ├── hello.py                   # runs inside python.sif
 │   ├── dask_example.py            # runs inside dask.sif
+│   └── uppmax_demo.sh             # runs inside Apptainer, calls sinfo/squeue
+├── scripts/
+│   ├── hello.py                   # runs inside python.sif
+│   ├── dask_example.py            # runs inside dask.sif via sbatch
+│   ├── dask_jobqueue_example.py   # SLURMCluster — workers submitted as Slurm jobs
 │   └── uppmax_demo.sh             # runs inside Apptainer, calls sinfo/squeue
 └── shared/                        # cluster shared filesystem
     ├── images/                    # built .sif files (gitignored)
