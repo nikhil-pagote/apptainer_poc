@@ -1,0 +1,24 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    slurm-wlm \
+    munge \
+    gosu \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create required directories and set ownership
+RUN mkdir -p \
+    /var/spool/slurmd \
+    /var/spool/slurmctld \
+    /var/log/slurm \
+    /var/run/slurm \
+    /var/run/munge \
+    && chown -R slurm:slurm /var/spool/slurmd /var/spool/slurmctld /var/log/slurm /var/run/slurm \
+    && chown -R munge:munge /var/run/munge /etc/munge
+
+COPY entrypoint/slurmctld.sh /entrypoint/slurmctld.sh
+COPY entrypoint/slurmd.sh    /entrypoint/slurmd.sh
+RUN chmod +x /entrypoint/slurmctld.sh /entrypoint/slurmd.sh

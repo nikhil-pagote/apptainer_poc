@@ -27,6 +27,15 @@ go.work.sum
 # env file
 .env
 
+# Apptainer built images (large binary files)
+shared/images/*.sif
+
+# Munge authentication key (secret)
+cluster/conf/munge.key
+
+# Slurm job output logs
+shared/output/*.out
+
 # Editor/IDE
 # .idea/
 # .vscode/

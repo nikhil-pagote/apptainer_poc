@@ -1,0 +1,19 @@
+Bootstrap: oci
+From: python:3.11-slim
+
+%labels
+    Author apptainer_poc
+    Description Python 3.11 with NumPy and SciPy for HPC jobs
+
+%post
+    pip install --no-cache-dir numpy scipy
+
+%runscript
+    exec python3 "$@"
+
+%help
+    Python 3.11 container with NumPy and SciPy.
+
+    Usage:
+        apptainer run python.sif script.py
+        apptainer exec python.sif python3 -c "import numpy; print(numpy.__version__)"

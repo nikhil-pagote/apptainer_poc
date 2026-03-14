@@ -1,0 +1,67 @@
+version: "3"
+
+# Multi-node HPC cluster simulation
+# - slurmctld : head/login node (submit jobs here)
+# - node1, node2 : compute nodes (run jobs here via slurmd)
+# Apptainer binary is bind-mounted from the host into compute nodes.
+# The /shared volume is the cluster's shared filesystem (like /scratch on real HPC).
+
+services:
+
+  slurmctld:
+    build:
+      context: .
+      dockerfile: Containerfile
+    hostname: slurmctld
+    container_name: slurmctld
+    entrypoint: ["/entrypoint/slurmctld.sh"]
+    volumes:
+      - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/munge.key:/etc/munge/munge.key:ro
+      - ../shared:/shared
+    networks:
+      - slurm-net
+    depends_on:
+      - node1
+      - node2
+
+  node1:
+    build:
+      context: .
+      dockerfile: Containerfile
+    hostname: node1
+    container_name: node1
+    entrypoint: ["/entrypoint/slurmd.sh"]
+    volumes:
+      - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/munge.key:/etc/munge/munge.key:ro
+      - ../shared:/shared
+      # Bind-mount Apptainer from host so jobs can run .sif containers
+      - /usr/bin/apptainer:/usr/bin/apptainer:ro
+      - /usr/libexec/apptainer:/usr/libexec/apptainer:ro
+    security_opt:
+      - apparmor=unconfined
+    networks:
+      - slurm-net
+
+  node2:
+    build:
+      context: .
+      dockerfile: Containerfile
+    hostname: node2
+    container_name: node2
+    entrypoint: ["/entrypoint/slurmd.sh"]
+    volumes:
+      - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/munge.key:/etc/munge/munge.key:ro
+      - ../shared:/shared
+      - /usr/bin/apptainer:/usr/bin/apptainer:ro
+      - /usr/libexec/apptainer:/usr/libexec/apptainer:ro
+    security_opt:
+      - apparmor=unconfined
+    networks:
+      - slurm-net
+
+networks:
+  slurm-net:
+    driver: bridge
