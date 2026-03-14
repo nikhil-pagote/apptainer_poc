@@ -116,7 +116,7 @@ apptainer_poc/
 ├── Makefile                       # make setup / up / down / shell / status
 ├── setup.sh                       # one-time setup script
 ├── cluster/
-│   ├── Containerfile              # Ubuntu 22.04 + Slurm + Munge + Apptainer
+│   ├── Containerfile              # Ubuntu 24.04 LTS + Slurm + Munge + Apptainer
 │   ├── docker-entrypoint.sh       # unified startup: slurmctld | slurmd | slurmdbd
 │   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + c1 + c2
 │   └── conf/
