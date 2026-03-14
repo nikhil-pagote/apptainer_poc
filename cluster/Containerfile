@@ -43,10 +43,10 @@ RUN mkdir -m 0755 -p \
         /var/log/slurm \
         /etc/slurm
 
-# Install dask[jobqueue] so the dask-client service can submit Dask workers
-# as Slurm jobs via SLURMCluster.
+# Install dask[distributed] so compute nodes can run dask-scheduler and
+# dask-worker processes launched as Slurm jobs.
 # --break-system-packages is required on Ubuntu 24.04 (PEP 668).
-RUN pip3 install --break-system-packages --no-cache-dir "dask[jobqueue]"
+RUN pip3 install --break-system-packages --no-cache-dir "dask[distributed]"
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

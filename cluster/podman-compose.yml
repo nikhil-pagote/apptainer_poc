@@ -114,26 +114,6 @@ services:
     depends_on:
       - slurmctld
 
-  # ── dask-client: submits Dask workers as Slurm jobs via dask-jobqueue ────────
-  # Uses SLURMCluster to dispatch Dask tasks across c1/c2 compute nodes.
-  # All containers share slurm-net so workers can connect back to the scheduler.
-  dask-client:
-    build:
-      context: .
-      dockerfile: Containerfile
-    hostname: dask-client
-    container_name: dask-client
-    command: dask-client
-    volumes:
-      - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
-      - ./conf/munge.key:/etc/munge/munge.key:ro
-      - ../shared:/shared
-      - slurm-logs:/var/log/slurm
-    networks:
-      - slurm-net
-    depends_on:
-      - c1
-      - c2
 
 volumes:
   postgres-data:

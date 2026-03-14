@@ -16,8 +16,7 @@ Host machine (Pop!_OS)
 │   ├── slurmdbd    ← Slurm database daemon
 │   ├── slurmctld   ← Head / login node  (submit jobs here)
 │   ├── c1          ← Compute node 1  (slurmd + Apptainer)
-│   ├── c2          ← Compute node 2  (slurmd + Apptainer)
-│   └── dask-client ← Submits Dask workers as Slurm jobs (dask-jobqueue)
+│   └── c2          ← Compute node 2  (slurmd + Apptainer)
 │
 └── shared/         ← Cluster shared filesystem (/scratch equivalent)
     ├── images/     ← Apptainer .sif images
@@ -74,7 +73,12 @@ sacct          # completed job accounting
 # Hello world — runs on both compute nodes
 sbatch /shared/jobs/hello.sh
 
-# Dask parallel computation
+# Dask distributed — scheduler + workers as Slurm jobs
+sbatch /shared/jobs/dask_scheduler.sh   # start scheduler on any node
+sbatch /shared/jobs/dask_workers.sh     # start workers on c1 + c2
+python3 /shared/scripts/dask_hello.py   # connect and run tasks
+
+# Dask single-node computation
 sbatch /shared/jobs/dask_job.sh
 
 # UPPMAX demo — calls sbatch/sinfo from WITHIN an Apptainer container
@@ -128,16 +132,14 @@ apptainer_poc/
 │   └── dask.def                   # Apptainer: Python 3.11 + Dask
 ├── jobs/
 │   ├── hello.sh                   # multi-node hello world
-│   ├── dask_job.sh                # Dask parallel computation
+│   ├── dask_job.sh                # Dask parallel computation (single node)
+│   ├── dask_scheduler.sh          # starts dask-scheduler on slurmctld
+│   ├── dask_workers.sh            # starts dask-worker on c1 + c2 via srun
 │   └── uppmax_demo.sh             # UPPMAX bind-mount pattern demo
 ├── scripts/
 │   ├── hello.py                   # runs inside python.sif
-│   ├── dask_example.py            # runs inside dask.sif
-│   └── uppmax_demo.sh             # runs inside Apptainer, calls sinfo/squeue
-├── scripts/
-│   ├── hello.py                   # runs inside python.sif
 │   ├── dask_example.py            # runs inside dask.sif via sbatch
-│   ├── dask_jobqueue_example.py   # SLURMCluster — workers submitted as Slurm jobs
+│   ├── dask_hello.py              # Dask client: connects to scheduler, maps hello() across workers
 │   └── uppmax_demo.sh             # runs inside Apptainer, calls sinfo/squeue
 └── shared/                        # cluster shared filesystem
     ├── images/                    # built .sif files (gitignored)
