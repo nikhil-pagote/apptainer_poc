@@ -78,9 +78,6 @@ sbatch /shared/jobs/dask_scheduler.sh   # start scheduler on any node
 sbatch /shared/jobs/dask_workers.sh     # start workers on c1 + c2
 python3 /shared/scripts/dask_hello.py   # connect and run tasks
 
-# Dask single-node computation
-sbatch /shared/jobs/dask_job.sh
-
 # UPPMAX demo — calls sbatch/sinfo from WITHIN an Apptainer container
 sbatch /shared/jobs/uppmax_demo.sh
 
@@ -123,22 +120,19 @@ apptainer_poc/
 ├── cluster/
 │   ├── Containerfile              # Ubuntu 24.04 LTS + Slurm + Munge + Apptainer
 │   ├── docker-entrypoint.sh       # unified startup: slurmctld | slurmd | slurmdbd
-│   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + c1 + c2 + dask-client
+│   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + c1 + c2
 │   └── conf/
 │       ├── slurm.conf             # Slurm cluster configuration
 │       └── slurmdbd.conf          # Slurm accounting daemon configuration
 ├── containers/
-│   ├── python.def                 # Apptainer: Python 3.11 + NumPy + SciPy
-│   └── dask.def                   # Apptainer: Python 3.11 + Dask
+│   └── python.def                 # Apptainer: Python 3.11 + NumPy + SciPy
 ├── jobs/
-│   ├── hello.sh                   # multi-node hello world
-│   ├── dask_job.sh                # Dask parallel computation (single node)
-│   ├── dask_scheduler.sh          # starts dask-scheduler on slurmctld
+│   ├── hello.sh                   # multi-node hello world (Apptainer + Slurm)
+│   ├── dask_scheduler.sh          # starts dask-scheduler as a Slurm job
 │   ├── dask_workers.sh            # starts dask-worker on c1 + c2 via srun
 │   └── uppmax_demo.sh             # UPPMAX bind-mount pattern demo
 ├── scripts/
 │   ├── hello.py                   # runs inside python.sif
-│   ├── dask_example.py            # runs inside dask.sif via sbatch
 │   ├── dask_hello.py              # Dask client: connects to scheduler, maps hello() across workers
 │   └── uppmax_demo.sh             # runs inside Apptainer, calls sinfo/squeue
 └── shared/                        # cluster shared filesystem
@@ -167,5 +161,4 @@ make rebuild     # rebuild images from scratch
 
 ```bash
 apptainer build shared/images/python.sif containers/python.def
-apptainer build shared/images/dask.sif   containers/dask.def
 ```
