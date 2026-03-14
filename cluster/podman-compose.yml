@@ -10,28 +10,27 @@ version: "3"
 #        └─────────────────┴──────────────────┘
 #                     slurm-net
 #
-# slurmdbd + mysql provide job accounting.
+# slurmdbd + postgres provide job accounting.
 # /shared is the cluster shared filesystem (equivalent to /scratch on real HPC).
 # Apptainer is installed INSIDE the images — compute nodes run .sif containers natively.
 
 services:
 
-  # ── MariaDB: accounting database ──────────────────────────────────────────
-  mysql:
-    image: mariadb:10.11
-    hostname: mysql
-    container_name: mysql
+  # ── PostgreSQL: accounting database ───────────────────────────────────────
+  postgres:
+    image: postgres:16
+    hostname: postgres
+    container_name: postgres
     environment:
-      MARIADB_ROOT_PASSWORD: root_password
-      MARIADB_USER: slurm
-      MARIADB_PASSWORD: slurm_password
-      MARIADB_DATABASE: slurm_acct_db
+      POSTGRES_USER: slurm
+      POSTGRES_PASSWORD: slurm_password
+      POSTGRES_DB: slurm_acct_db
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - slurm-net
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "slurm", "-pslurm_password"]
+      test: ["CMD-SHELL", "pg_isready -U slurm -d slurm_acct_db"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -52,7 +51,7 @@ services:
     networks:
       - slurm-net
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
 
   # ── slurmctld: head / login node ──────────────────────────────────────────
@@ -116,7 +115,7 @@ services:
       - slurmctld
 
 volumes:
-  mysql-data:
+  postgres-data:
   slurm-state:
   slurm-logs:
 

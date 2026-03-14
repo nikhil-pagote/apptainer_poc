@@ -28,7 +28,7 @@ case "$1" in
         chown slurm:slurm /etc/slurm/slurmdbd.conf
         chmod 600 /etc/slurm/slurmdbd.conf
 
-        wait_for mysql 3306
+        wait_for postgres 5432
         echo "[entrypoint] Starting slurmdbd..."
         exec gosu slurm slurmdbd -D
         ;;

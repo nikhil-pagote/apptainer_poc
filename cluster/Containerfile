@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     slurmdbd \
     munge \
     gosu \
-    mariadb-client \
+    postgresql-client \
     curl \
     python3 \
     python3-pip \

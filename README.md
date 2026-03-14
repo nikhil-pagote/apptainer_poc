@@ -12,7 +12,7 @@ Follows the [UPPMAX Singularity/Apptainer workshop](https://pmitev.github.io/UPP
 Host machine (Pop!_OS)
 │
 ├── Podman (rootless)
-│   ├── mysql       ← MariaDB — job accounting database
+│   ├── postgres    ← PostgreSQL — job accounting database
 │   ├── slurmdbd    ← Slurm database daemon
 │   ├── slurmctld   ← Head / login node  (submit jobs here)
 │   ├── c1          ← Compute node 1  (slurmd + Apptainer)
@@ -28,7 +28,7 @@ Host machine (Pop!_OS)
 **Key design points:**
 - Apptainer is installed **inside** each compute node image — no bind-mounting from host
 - The [UPPMAX bind-mount pattern](https://pmitev.github.io/UPPMAX-Singularity-workshop/CaseStudies/SLURM_in_container/) is demonstrated: Slurm commands (`sbatch`, `squeue`) work from **within** an Apptainer container by bind-mounting the node's Slurm binaries + munge socket
-- `slurmdbd` + MariaDB provide full job accounting (`sacct`)
+- `slurmdbd` + PostgreSQL provide full job accounting (`sacct`)
 
 ---
 
@@ -118,7 +118,7 @@ apptainer_poc/
 ├── cluster/
 │   ├── Containerfile              # Ubuntu 22.04 + Slurm + Munge + Apptainer
 │   ├── docker-entrypoint.sh       # unified startup: slurmctld | slurmd | slurmdbd
-│   ├── podman-compose.yml         # mysql + slurmdbd + slurmctld + c1 + c2
+│   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + c1 + c2
 │   └── conf/
 │       ├── slurm.conf             # Slurm cluster configuration
 │       └── slurmdbd.conf          # Slurm accounting daemon configuration
