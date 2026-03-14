@@ -1,0 +1,73 @@
+version: '3.8'
+
+# ── Common build definition (YAML anchor) ────────────────────────────────────
+x-hpc-node: &hpc-node
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  image: hpc-sim:latest
+
+# ── Common volume mounts ──────────────────────────────────────────────────────
+x-common-volumes: &common-volumes
+  - shared_data:/shared
+  - ../slurm/slurm.conf:/etc/slurm/slurm.conf:ro
+  - ../slurm/cgroup.conf:/etc/slurm/cgroup.conf:ro
+
+services:
+
+  # ── Slurm controller (login / head node) ─────────────────────────────────
+  slurmctld:
+    <<: *hpc-node
+    hostname: slurmctld
+    container_name: slurmctld
+    environment:
+      - NODE_TYPE=controller
+      - SHARED_DIR=/shared
+    volumes:
+      - shared_data:/shared
+      - ../slurm/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ../slurm/cgroup.conf:/etc/slurm/cgroup.conf:ro
+      # Dask scripts are visible to the controller so it can copy them to /shared
+      - ../dask:/repo/dask:ro
+    networks:
+      - hpc-net
+    ports:
+      - "6817:6817"   # slurmctld RPC
+      - "8786:8786"   # Dask scheduler
+      - "8787:8787"   # Dask dashboard
+
+  # ── Compute node 1 ──────────────────────────────────────────────────────
+  worker1:
+    <<: *hpc-node
+    hostname: worker1
+    container_name: worker1
+    environment:
+      - NODE_TYPE=worker
+      - SHARED_DIR=/shared
+    volumes: *common-volumes
+    depends_on:
+      - slurmctld
+    networks:
+      - hpc-net
+
+  # ── Compute node 2 ──────────────────────────────────────────────────────
+  worker2:
+    <<: *hpc-node
+    hostname: worker2
+    container_name: worker2
+    environment:
+      - NODE_TYPE=worker
+      - SHARED_DIR=/shared
+    volumes: *common-volumes
+    depends_on:
+      - slurmctld
+    networks:
+      - hpc-net
+
+networks:
+  hpc-net:
+    driver: bridge
+
+volumes:
+  shared_data:
+    driver: local

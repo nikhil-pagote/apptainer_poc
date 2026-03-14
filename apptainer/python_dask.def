@@ -1,0 +1,49 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%post
+    # Install build tools and system libraries
+    apt-get update -y
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        libssl-dev \
+        procps
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+    # Install Python packages
+    pip install --no-cache-dir \
+        "dask[distributed]>=2023.1.0" \
+        "numpy>=1.24.0" \
+        "pandas>=2.0.0"
+
+%environment
+    export PATH=/usr/local/bin:$PATH
+    export PYTHONUNBUFFERED=1
+
+%runscript
+    exec python "$@"
+
+%labels
+    Author      HPC-Sim-POC
+    Version     1.0.0
+    Description Python 3.11 with Dask Distributed for HPC simulations
+
+%help
+    Apptainer container providing Python 3.11 + Dask Distributed.
+
+    Build:
+        apptainer build python_dask.sif apptainer/python_dask.def
+
+    Usage examples:
+        # Run a Python script
+        apptainer run python_dask.sif script.py
+
+        # Start a Dask scheduler
+        apptainer exec python_dask.sif dask-scheduler --host <HOST> --port 8786
+
+        # Start a Dask worker
+        apptainer exec python_dask.sif dask-worker <SCHEDULER_HOST>:8786
+
+        # Run the demo (scheduler address passed as argument)
+        apptainer exec python_dask.sif python dask_demo.py <SCHEDULER_HOST>:8786
