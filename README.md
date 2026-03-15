@@ -14,10 +14,10 @@ Host machine (Pop!_OS)
 ├── Podman (rootless)
 │   ├── postgres         ← PostgreSQL 18 — job accounting database
 │   ├── slurmdbd         ← Slurm database daemon
-│   ├── slurmctld        ← Head / login node  (submit jobs here)
-│   ├── dask-scheduler   ← Slurm node: partition=dask-scheduler  (runs dask-scheduler process)
-│   ├── c1               ← Slurm node: partition=dask-workers + compute  (runs dask-worker)
-│   └── c2               ← Slurm node: partition=dask-workers + compute  (runs dask-worker)
+│   ├── slurmctld        ← Head / login node  (submit jobs from here)
+│   ├── dask-scheduler   ← Slurm node: partition=dask-scheduler
+│   ├── c1               ← Slurm node: partition=dask-workers + compute
+│   └── c2               ← Slurm node: partition=dask-workers + compute
 │
 └── shared/         ← Cluster shared filesystem (/scratch equivalent)
     ├── images/     ← Apptainer .sif images
@@ -26,10 +26,19 @@ Host machine (Pop!_OS)
     └── output/     ← Job stdout/stderr logs
 ```
 
+**Slurm partitions:**
+
+| Partition | Nodes | Purpose |
+|-----------|-------|---------|
+| `compute` | c1, c2 | General-purpose jobs (default) |
+| `dask-scheduler` | dask-scheduler | Dedicated Dask scheduler node |
+| `dask-workers` | c1, c2 | Dask worker jobs |
+
 **Key design points:**
-- Apptainer is installed **inside** each compute node image — no bind-mounting from host
-- The [UPPMAX bind-mount pattern](https://pmitev.github.io/UPPMAX-Singularity-workshop/CaseStudies/SLURM_in_container/) is demonstrated: Slurm commands (`sbatch`, `squeue`) work from **within** an Apptainer container by bind-mounting the node's Slurm binaries + munge socket
+- Apptainer is installed **inside** each node image (not bind-mounted from host)
+- The [UPPMAX bind-mount pattern](https://pmitev.github.io/UPPMAX-Singularity-workshop/CaseStudies/SLURM_in_container/) is demonstrated: Slurm commands work from **within** an Apptainer container by bind-mounting the node's Slurm binaries + munge socket
 - `slurmdbd` + PostgreSQL 18 provide full job accounting (`sacct`)
+- All Slurm nodes share a single image (`localhost/cluster_slurm`) built from `cluster/Containerfile`
 
 ---
 
@@ -37,8 +46,9 @@ Host machine (Pop!_OS)
 
 | Tool | Install |
 |------|---------|
-| Apptainer 1.4+ | `sudo apt install ./apptainer_1.4.5_amd64.deb` |
 | Podman 4.0+ | `sudo apt install podman podman-compose` |
+
+Apptainer is **not required on the host** — it is installed inside the cluster image. It is only needed if you want to build `.sif` images on the host.
 
 ---
 
@@ -51,7 +61,12 @@ make setup
 # or: ./setup.sh
 ```
 
-This generates the munge key, builds Apptainer `.sif` images, and starts the cluster.
+This will:
+1. Generate the munge authentication key
+2. Configure `~/.config/containers/registries.conf` for local image resolution
+3. Build the cluster image (`localhost/cluster_slurm`) and tag it for all services
+4. Sync scripts/jobs to `/shared`
+5. Start all containers with `podman-compose up -d`
 
 ### 2. Shell into the head node
 
@@ -71,15 +86,15 @@ sacct          # completed job accounting
 ### 4. Submit jobs
 
 ```bash
-# Hello world — runs on both compute nodes
+# Hello world — runs on both compute nodes via Apptainer
 sbatch /shared/jobs/hello.sh
 
 # Dask distributed — scheduler + workers as Slurm jobs
-sbatch /shared/jobs/dask_scheduler.sh   # start scheduler on dask-scheduler node
-sbatch /shared/jobs/dask_workers.sh     # start workers on c1 + c2
-python3 /shared/scripts/dask_hello.py   # connect and run tasks
+sbatch /shared/jobs/dask_scheduler.sh   # runs on dask-scheduler node (partition=dask-scheduler)
+sbatch /shared/jobs/dask_workers.sh     # runs on c1 + c2 (partition=dask-workers)
+python3 /shared/scripts/dask_hello.py   # connect client and run tasks
 
-# UPPMAX demo — calls sbatch/sinfo from WITHIN an Apptainer container
+# UPPMAX demo — calls sinfo/squeue from WITHIN an Apptainer container
 sbatch /shared/jobs/uppmax_demo.sh
 
 # Monitor
@@ -108,7 +123,7 @@ echo "slurm:x:990:" >> /etc/group
 sbatch next_step.sh   # works inside the container
 ```
 
-The `jobs/uppmax_demo.sh` and `scripts/uppmax_demo.sh` demonstrate this pattern on the local simulation cluster.
+`jobs/uppmax_demo.sh` and `scripts/uppmax_demo.sh` demonstrate this on the local simulation cluster.
 
 ---
 
@@ -116,31 +131,31 @@ The `jobs/uppmax_demo.sh` and `scripts/uppmax_demo.sh` demonstrate this pattern 
 
 ```
 apptainer_poc/
-├── Makefile                       # make setup / up / down / shell / status
+├── Makefile                       # make setup / build / up / down / shell / status
 ├── setup.sh                       # one-time setup script
 ├── cluster/
-│   ├── Containerfile              # Ubuntu 24.04 LTS + Slurm + Munge + Apptainer
+│   ├── Containerfile              # Ubuntu 24.04 LTS + Slurm + Munge + Apptainer 1.4.5
 │   ├── docker-entrypoint.sh       # unified startup: slurmctld | slurmd | slurmdbd
 │   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + dask-scheduler + c1 + c2
 │   └── conf/
-│       ├── slurm.conf             # Slurm cluster configuration
-│       └── slurmdbd.conf          # Slurm accounting daemon configuration
+│       ├── slurm.conf             # Slurm cluster configuration (nodes + partitions)
+│       └── slurmdbd.conf          # Slurm accounting daemon → PostgreSQL
 ├── containers/
 │   └── python.def                 # Apptainer: Python 3.11 + NumPy + SciPy
 ├── jobs/
 │   ├── hello.sh                   # multi-node hello world (Apptainer + Slurm)
-│   ├── dask_scheduler.sh          # starts dask-scheduler as a Slurm job
-│   ├── dask_workers.sh            # starts dask-worker on c1 + c2 via srun
-│   └── uppmax_demo.sh             # UPPMAX bind-mount pattern demo
+│   ├── dask_scheduler.sh          # sbatch: starts dask-scheduler on dask-scheduler node
+│   ├── dask_workers.sh            # sbatch: starts dask-worker on c1 + c2 via srun
+│   └── uppmax_demo.sh             # sbatch: UPPMAX bind-mount pattern demo
 ├── scripts/
 │   ├── hello.py                   # runs inside python.sif
 │   ├── dask_hello.py              # Dask client: connects to scheduler, maps hello() across workers
 │   └── uppmax_demo.sh             # runs inside Apptainer, calls sinfo/squeue
-└── shared/                        # cluster shared filesystem
+└── shared/                        # cluster shared filesystem (bind-mounted into all nodes)
     ├── images/                    # built .sif files (gitignored)
     ├── scripts/                   # synced from scripts/ by setup.sh
     ├── jobs/                      # synced from jobs/ by setup.sh
-    └── output/                    # job logs (gitignored)
+    └── output/                    # job stdout/stderr logs (gitignored)
 ```
 
 ---
@@ -148,18 +163,28 @@ apptainer_poc/
 ## Cluster Management
 
 ```bash
-make up          # start cluster
+make build       # build cluster image + tag for all services
+make up          # build + start cluster
 make down        # stop cluster
-make shell       # shell into head node
+make shell       # shell into head node (slurmctld)
 make status      # sinfo
 make queue       # squeue
 make logs        # tail slurmctld logs
 make clean       # stop + remove all volumes (full reset)
-make rebuild     # rebuild images from scratch
+make rebuild     # rebuild image from scratch (no cache) + restart
 ```
 
-## Rebuilding Apptainer Images
+## Notes
 
+### podman-compose image naming
+podman-compose 1.0.6 always derives image names as `<project>_<service>` regardless of the `image:` field. The build step tags `localhost/cluster_slurm` with all expected names (`localhost/cluster_c1`, `localhost/cluster_slurmctld`, etc.) and `~/.config/containers/registries.conf` is configured to search `localhost` for unqualified names.
+
+### Apptainer on host
+Not required for running the cluster. Only needed to build `.sif` images locally:
 ```bash
 apptainer build shared/images/python.sif containers/python.def
+```
+Alternatively, build from inside slurmctld:
+```bash
+podman exec -it slurmctld apptainer build /shared/images/python.sif /shared/containers/python.def
 ```

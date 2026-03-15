@@ -6,11 +6,14 @@ setup:
 
 # Build container images only
 build:
-	cd cluster && podman-compose build
+	cd cluster && podman build -t localhost/cluster_slurm -f Containerfile . \
+		&& for svc in slurmdbd slurmctld dask-scheduler c1 c2; do podman tag localhost/cluster_slurm "localhost/cluster_$${svc}"; done
 
 # Start the cluster (build first if needed)
 up:
-	cd cluster && podman-compose up -d
+	cd cluster && podman build -t localhost/cluster_slurm -f Containerfile . \
+		&& for svc in slurmdbd slurmctld dask-scheduler c1 c2; do podman tag localhost/cluster_slurm "localhost/cluster_$${svc}"; done \
+		&& podman-compose up -d
 
 # Stop the cluster
 down:
@@ -38,4 +41,6 @@ clean:
 
 # Rebuild images from scratch (no cache) and restart
 rebuild:
-	cd cluster && podman-compose build --no-cache && podman-compose up -d
+	cd cluster && podman build --no-cache -t localhost/cluster_slurm -f Containerfile . \
+		&& for svc in slurmdbd slurmctld dask-scheduler c1 c2; do podman tag localhost/cluster_slurm "localhost/cluster_$${svc}"; done \
+		&& podman-compose up -d

@@ -37,9 +37,7 @@ services:
 
   # ── slurmdbd: accounting daemon ───────────────────────────────────────────
   slurmdbd:
-    build:
-      context: .
-      dockerfile: Containerfile
+    image: localhost/cluster_slurm
     hostname: slurmdbd
     container_name: slurmdbd
     command: slurmdbd
@@ -56,9 +54,7 @@ services:
 
   # ── slurmctld: head / login node ──────────────────────────────────────────
   slurmctld:
-    build:
-      context: .
-      dockerfile: Containerfile
+    image: localhost/cluster_slurm
     hostname: slurmctld
     container_name: slurmctld
     command: slurmctld
@@ -76,9 +72,7 @@ services:
 
   # ── dask-scheduler: dedicated node for Dask scheduler partition ───────────
   dask-scheduler:
-    build:
-      context: .
-      dockerfile: Containerfile
+    image: localhost/cluster_slurm
     hostname: dask-scheduler
     container_name: dask-scheduler
     command: slurmd
@@ -96,9 +90,7 @@ services:
 
   # ── c1: compute node 1 ────────────────────────────────────────────────────
   c1:
-    build:
-      context: .
-      dockerfile: Containerfile
+    image: localhost/cluster_slurm
     hostname: c1
     container_name: c1
     command: slurmd
@@ -116,9 +108,7 @@ services:
 
   # ── c2: compute node 2 ────────────────────────────────────────────────────
   c2:
-    build:
-      context: .
-      dockerfile: Containerfile
+    image: localhost/cluster_slurm
     hostname: c2
     container_name: c2
     command: slurmd

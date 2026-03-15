@@ -29,27 +29,36 @@ else
     echo "    python.sif already exists, skipping."
 fi
 
-if [ ! -f "$SHARED/images/dask.sif" ]; then
-    apptainer build "$SHARED/images/dask.sif" containers/dask.def
-    echo "    Built: dask.sif"
-else
-    echo "    dask.sif already exists, skipping."
-fi
 
 echo "==> Syncing scripts and jobs to shared filesystem..."
 cp -r "$REPO_ROOT/scripts/." "$SHARED/scripts/"
 cp -r "$REPO_ROOT/jobs/."    "$SHARED/jobs/"
 echo "    Done."
 
-echo "==> Building and starting the Slurm cluster..."
+echo "==> Configuring Podman registries for local image resolution..."
+mkdir -p "$HOME/.config/containers"
+if ! grep -q "localhost" "$HOME/.config/containers/registries.conf" 2>/dev/null; then
+    cat >> "$HOME/.config/containers/registries.conf" <<'EOF'
+unqualified-search-registries = ["localhost", "docker.io"]
+EOF
+    echo "    Updated: ~/.config/containers/registries.conf"
+else
+    echo "    Already configured, skipping."
+fi
+
+echo "==> Building cluster image and tagging for podman-compose..."
 cd "$REPO_ROOT/cluster"
-podman-compose build
+podman build -t localhost/cluster_slurm -f Containerfile .
+# podman-compose 1.0.6 always uses <project>_<service> as image name — tag accordingly
+for svc in slurmdbd slurmctld dask-scheduler c1 c2; do
+    podman tag localhost/cluster_slurm "localhost/cluster_${svc}"
+done
 podman-compose up -d
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║  Cluster is up!                                              ║"
-echo "║  Services: mysql  slurmdbd  slurmctld  c1  c2               ║"
+echo "║  Services: postgres  slurmdbd  slurmctld  dask-scheduler  c1  c2  ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 echo "  Shell into the head node:"
