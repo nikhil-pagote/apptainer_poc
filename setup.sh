@@ -53,7 +53,7 @@ podman build -t localhost/cluster_slurm -f Containerfile .
 for svc in slurmdbd slurmctld dask-scheduler c1 c2; do
     podman tag localhost/cluster_slurm "localhost/cluster_${svc}"
 done
-podman-compose up -d
+podman-compose -f podman-compose.yml up -d
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"

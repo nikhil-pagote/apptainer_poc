@@ -47,7 +47,8 @@ Host machine (Pop!_OS)
 
 | Tool | Install |
 |------|---------|
-| Podman 4.0+ | `sudo apt install podman podman-compose` |
+| Podman 4.0+ | `sudo apt install podman` |
+| podman-compose 1.5.0+ | `pip3 install --break-system-packages podman-compose` |
 
 Apptainer is **not required on the host** — it is installed inside the cluster image. It is only needed if you want to build `.sif` images on the host.
 
@@ -184,8 +185,8 @@ make rebuild     # rebuild image from scratch (no cache) + restart
 ### podman-compose image naming
 podman-compose 1.0.6 always derives image names as `<project>_<service>` regardless of the `image:` field. The build step tags `localhost/cluster_slurm` with all expected names (`localhost/cluster_c1`, `localhost/cluster_slurmctld`, etc.) and `~/.config/containers/registries.conf` is configured to search `localhost` for unqualified names.
 
-### depends_on not used
-`depends_on` is intentionally omitted from `podman-compose.yml`. podman-compose 1.0.6 converts it to `--requires` which has a broken dependency-chain bug: when A→B→C, starting A fails because C is not in the same `podman start` invocation. Service ordering is handled by `wait_for()` loops in `docker-entrypoint.sh` instead.
+### depends_on and podman-compose version
+Requires **podman-compose 1.5.0+** (install via `pip3 install --break-system-packages podman-compose`). Version 1.0.6 (from `apt`) had a broken `--requires` dependency-chain bug where A→B→C startup would fail. 1.5.0 fixes this, so `depends_on` is used normally. Service ordering is also reinforced by `wait_for()` loops in `docker-entrypoint.sh`.
 
 ### slurmdbd.conf ownership
 slurmdbd requires its config file to be `mode 600` and owned by `SlurmUser`. In rootless Podman, the host user maps to root inside the container, so a directly bind-mounted file would be root-owned. The entrypoint copies the bind-mounted template to `/etc/slurm/slurmdbd.conf` and `chown`s it to the slurm user before starting the daemon.

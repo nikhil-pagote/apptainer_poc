@@ -14,11 +14,6 @@ version: "3"
 # Slurm 20.11+ dropped PostgreSQL support; MariaDB/MySQL is the required backend.
 # /shared is the cluster shared filesystem (equivalent to /scratch on real HPC).
 # Apptainer is installed INSIDE the images — compute nodes run .sif containers natively.
-#
-# Note: depends_on is omitted intentionally — podman-compose 1.0.6 translates it
-# to --requires which has a broken dependency-chain resolution bug (pod A→B→C fails
-# when C is not in the same podman-start invocation). Startup ordering is handled
-# by wait_for() loops in docker-entrypoint.sh instead.
 
 services:
 
@@ -53,6 +48,8 @@ services:
       - slurm-logs:/var/log/slurm
     networks:
       - slurm-net
+    depends_on:
+      - mariadb
 
   # ── slurmctld: head / login node ──────────────────────────────────────────
   slurmctld:
@@ -70,6 +67,8 @@ services:
       - slurm-logs:/var/log/slurm
     networks:
       - slurm-net
+    depends_on:
+      - slurmdbd
 
   # ── dask-scheduler: dedicated node for Dask scheduler partition ───────────
   dask-scheduler:
@@ -87,6 +86,8 @@ services:
       - apparmor=unconfined
     networks:
       - slurm-net
+    depends_on:
+      - slurmctld
 
   # ── c1: compute node 1 ────────────────────────────────────────────────────
   c1:
@@ -104,6 +105,8 @@ services:
       - apparmor=unconfined
     networks:
       - slurm-net
+    depends_on:
+      - slurmctld
 
   # ── c2: compute node 2 ────────────────────────────────────────────────────
   c2:
@@ -121,6 +124,8 @@ services:
       - apparmor=unconfined
     networks:
       - slurm-net
+    depends_on:
+      - slurmctld
 
 
 volumes:

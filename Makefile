@@ -1,5 +1,7 @@
 .PHONY: setup build up down shell status logs clean rebuild
 
+COMPOSE = podman-compose -f podman-compose.yml
+
 # One-time setup: munge key + Apptainer images + start cluster
 setup:
 	./setup.sh
@@ -13,11 +15,11 @@ build:
 up:
 	cd cluster && podman build -t localhost/cluster_slurm -f Containerfile . \
 		&& for svc in slurmdbd slurmctld dask-scheduler c1 c2; do podman tag localhost/cluster_slurm "localhost/cluster_$${svc}"; done \
-		&& podman-compose up -d
+		&& $(COMPOSE) up -d
 
 # Stop the cluster
 down:
-	cd cluster && podman-compose down
+	cd cluster && $(COMPOSE) down
 
 # Open an interactive shell on the head node (submit jobs from here)
 shell:
@@ -37,10 +39,10 @@ logs:
 
 # Stop cluster and remove all volumes (full reset)
 clean:
-	cd cluster && podman-compose down -v
+	cd cluster && $(COMPOSE) down -v
 
 # Rebuild images from scratch (no cache) and restart
 rebuild:
 	cd cluster && podman build --no-cache -t localhost/cluster_slurm -f Containerfile . \
 		&& for svc in slurmdbd slurmctld dask-scheduler c1 c2; do podman tag localhost/cluster_slurm "localhost/cluster_$${svc}"; done \
-		&& podman-compose up -d
+		&& $(COMPOSE) up -d
