@@ -10,30 +10,34 @@ version: "3"
 #        └──────────────────┴───────────────────┴──────────────────┘
 #                                  slurm-net
 #
-# slurmdbd + postgres provide job accounting.
+# slurmdbd + MariaDB provide job accounting.
+# Slurm 20.11+ dropped PostgreSQL support; MariaDB/MySQL is the required backend.
 # /shared is the cluster shared filesystem (equivalent to /scratch on real HPC).
 # Apptainer is installed INSIDE the images — compute nodes run .sif containers natively.
+#
+# Note: depends_on is omitted intentionally — podman-compose 1.0.6 translates it
+# to --requires which has a broken dependency-chain resolution bug (pod A→B→C fails
+# when C is not in the same podman-start invocation). Startup ordering is handled
+# by wait_for() loops in docker-entrypoint.sh instead.
 
 services:
 
-  # ── PostgreSQL: accounting database ───────────────────────────────────────
-  postgres:
-    image: docker.io/postgres:18
-    hostname: postgres
-    container_name: postgres
+  # ── MariaDB: accounting database ──────────────────────────────────────────
+  # Note: Slurm 20.11+ dropped PostgreSQL support. MariaDB is the required
+  # backend for slurmdbd accounting storage.
+  mariadb:
+    image: docker.io/mariadb:11
+    hostname: mariadb
+    container_name: mariadb
     environment:
-      POSTGRES_USER: slurm
-      POSTGRES_PASSWORD: slurm_password
-      POSTGRES_DB: slurm_acct_db
+      MARIADB_ROOT_PASSWORD: root_password
+      MARIADB_USER: slurm
+      MARIADB_PASSWORD: slurm_password
+      MARIADB_DATABASE: slurm_acct_db
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - mariadb-data:/var/lib/mysql
     networks:
       - slurm-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U slurm -d slurm_acct_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
   # ── slurmdbd: accounting daemon ───────────────────────────────────────────
   slurmdbd:
@@ -43,14 +47,12 @@ services:
     command: slurmdbd
     volumes:
       - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
-      - ./conf/slurmdbd.conf:/etc/slurm/slurmdbd.conf
+      - ./conf/cgroup.conf:/etc/slurm/cgroup.conf:ro
+      - ./conf/slurmdbd.conf:/etc/slurm/slurmdbd.conf.template:ro
       - ./conf/munge.key:/etc/munge/munge.key:ro
       - slurm-logs:/var/log/slurm
     networks:
       - slurm-net
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   # ── slurmctld: head / login node ──────────────────────────────────────────
   slurmctld:
@@ -60,6 +62,7 @@ services:
     command: slurmctld
     volumes:
       - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/cgroup.conf:/etc/slurm/cgroup.conf:ro
       - ./conf/slurmdbd.conf:/etc/slurm/slurmdbd.conf:ro
       - ./conf/munge.key:/etc/munge/munge.key:ro
       - ../shared:/shared
@@ -67,8 +70,6 @@ services:
       - slurm-logs:/var/log/slurm
     networks:
       - slurm-net
-    depends_on:
-      - slurmdbd
 
   # ── dask-scheduler: dedicated node for Dask scheduler partition ───────────
   dask-scheduler:
@@ -78,6 +79,7 @@ services:
     command: slurmd
     volumes:
       - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/cgroup.conf:/etc/slurm/cgroup.conf:ro
       - ./conf/munge.key:/etc/munge/munge.key:ro
       - ../shared:/shared
       - slurm-logs:/var/log/slurm
@@ -85,8 +87,6 @@ services:
       - apparmor=unconfined
     networks:
       - slurm-net
-    depends_on:
-      - slurmctld
 
   # ── c1: compute node 1 ────────────────────────────────────────────────────
   c1:
@@ -96,6 +96,7 @@ services:
     command: slurmd
     volumes:
       - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/cgroup.conf:/etc/slurm/cgroup.conf:ro
       - ./conf/munge.key:/etc/munge/munge.key:ro
       - ../shared:/shared
       - slurm-logs:/var/log/slurm
@@ -103,8 +104,6 @@ services:
       - apparmor=unconfined
     networks:
       - slurm-net
-    depends_on:
-      - slurmctld
 
   # ── c2: compute node 2 ────────────────────────────────────────────────────
   c2:
@@ -114,6 +113,7 @@ services:
     command: slurmd
     volumes:
       - ./conf/slurm.conf:/etc/slurm/slurm.conf:ro
+      - ./conf/cgroup.conf:/etc/slurm/cgroup.conf:ro
       - ./conf/munge.key:/etc/munge/munge.key:ro
       - ../shared:/shared
       - slurm-logs:/var/log/slurm
@@ -121,12 +121,10 @@ services:
       - apparmor=unconfined
     networks:
       - slurm-net
-    depends_on:
-      - slurmctld
 
 
 volumes:
-  postgres-data:
+  mariadb-data:
   slurm-state:
   slurm-logs:
 

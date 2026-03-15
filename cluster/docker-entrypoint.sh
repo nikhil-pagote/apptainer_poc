@@ -15,22 +15,29 @@ wait_for() {
 }
 
 # ── munge (required by every service) ─────────────────────────────────────────
-chown munge:munge /etc/munge/munge.key
-chmod 400 /etc/munge/munge.key
-gosu munge munged --foreground &
+# Copy the read-only bind-mounted key to /tmp so we can chown it without
+# touching the host file, then start munged with the socket dir owned by munge.
+cp /etc/munge/munge.key /tmp/munge.key
+chown munge:munge /tmp/munge.key
+chmod 400 /tmp/munge.key
+mkdir -p /run/munge
+chown munge:munge /run/munge
+gosu munge munged --key-file /tmp/munge.key --foreground &
 sleep 2
 
 # ── service dispatch ───────────────────────────────────────────────────────────
 case "$1" in
 
     slurmdbd)
-        # Fix slurmdbd.conf permissions (must be 600, owned by slurm)
+        # slurmdbd requires slurmdbd.conf to be owned by SlurmUser and mode 600.
+        # The bind-mounted template is root-owned (rootless Podman maps host user → root).
+        # Copy the template to /etc/slurm/slurmdbd.conf, chown to slurm, then start.
+        cp /etc/slurm/slurmdbd.conf.template /etc/slurm/slurmdbd.conf
         chown slurm:slurm /etc/slurm/slurmdbd.conf
         chmod 600 /etc/slurm/slurmdbd.conf
-
-        wait_for postgres 5432
+        wait_for mariadb 3306
         echo "[entrypoint] Starting slurmdbd..."
-        exec gosu slurm slurmdbd -D
+        exec slurmdbd -D
         ;;
 
     slurmctld)

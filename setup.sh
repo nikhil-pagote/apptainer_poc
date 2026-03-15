@@ -58,7 +58,7 @@ podman-compose up -d
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║  Cluster is up!                                              ║"
-echo "║  Services: postgres  slurmdbd  slurmctld  dask-scheduler  c1  c2  ║"
+echo "║  Services: mariadb  slurmdbd  slurmctld  dask-scheduler  c1  c2  ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 echo "  Shell into the head node:"

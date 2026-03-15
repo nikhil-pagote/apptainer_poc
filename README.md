@@ -12,7 +12,7 @@ Follows the [UPPMAX Singularity/Apptainer workshop](https://pmitev.github.io/UPP
 Host machine (Pop!_OS)
 │
 ├── Podman (rootless)
-│   ├── postgres         ← PostgreSQL 18 — job accounting database
+│   ├── mariadb          ← MariaDB 11 — job accounting database
 │   ├── slurmdbd         ← Slurm database daemon
 │   ├── slurmctld        ← Head / login node  (submit jobs from here)
 │   ├── dask-scheduler   ← Slurm node: partition=dask-scheduler
@@ -37,7 +37,7 @@ Host machine (Pop!_OS)
 **Key design points:**
 - Apptainer is installed **inside** each node image (not bind-mounted from host)
 - The [UPPMAX bind-mount pattern](https://pmitev.github.io/UPPMAX-Singularity-workshop/CaseStudies/SLURM_in_container/) is demonstrated: Slurm commands work from **within** an Apptainer container by bind-mounting the node's Slurm binaries + munge socket
-- `slurmdbd` + PostgreSQL 18 provide full job accounting (`sacct`)
+- `slurmdbd` + MariaDB 11 provide full job accounting (`sacct`). Note: Slurm 20.11+ dropped PostgreSQL support; MariaDB/MySQL is the only supported backend.
 - All Slurm nodes share a single image (`localhost/cluster_slurm`) built from `cluster/Containerfile`
 
 ---
@@ -136,10 +136,11 @@ apptainer_poc/
 ├── cluster/
 │   ├── Containerfile              # Ubuntu 24.04 LTS + Slurm + Munge + Apptainer 1.4.5
 │   ├── docker-entrypoint.sh       # unified startup: slurmctld | slurmd | slurmdbd
-│   ├── podman-compose.yml         # postgres + slurmdbd + slurmctld + dask-scheduler + c1 + c2
+│   ├── podman-compose.yml         # mariadb + slurmdbd + slurmctld + dask-scheduler + c1 + c2
 │   └── conf/
 │       ├── slurm.conf             # Slurm cluster configuration (nodes + partitions)
-│       └── slurmdbd.conf          # Slurm accounting daemon → PostgreSQL
+│       ├── cgroup.conf            # Disables cgroup v2 (requires systemd) for container compat
+│       └── slurmdbd.conf          # Slurm accounting daemon → MariaDB
 ├── containers/
 │   └── python.def                 # Apptainer: Python 3.11 + NumPy + SciPy
 ├── jobs/
